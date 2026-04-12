@@ -1,0 +1,24 @@
+# Template — replace ${HUBMQ_NKEY} and ${PUB_NKEY} on deploy (Task 3)
+server_name: "hubmq-lxc415"
+listen: 0.0.0.0:4222
+http: localhost:8222
+
+jetstream {
+    store_dir: "/var/lib/nats/jetstream"
+    max_memory_store: 256MB
+    max_file_store: 10GB
+}
+
+accounts {
+    HUBMQ: {
+        jetstream: enabled
+        users: [
+            {nkey: "${PUB_NKEY}", permissions: {publish: ["alert.>", "monitor.>", "agent.>", "system.>", "cron.>", "user.incoming.>"], subscribe: ["_INBOX.>"]}}
+            {nkey: "${HUBMQ_NKEY}", permissions: {publish: [">"], subscribe: [">"]}}
+        ]
+    }
+}
+
+logfile: "/var/log/nats-server.log"
+debug: false
+trace: false
