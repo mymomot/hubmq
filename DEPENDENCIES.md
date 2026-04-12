@@ -1,7 +1,7 @@
 # Dépendances — HubMQ
 
 > Généré le : 2026-04-12
-> Commit ref : 19a6bf9
+> Commit ref : a55abda
 
 Workspace Cargo : `hubmq-bin` (daemon) + `hubmq-core` (library).
 Rust 1.93.1 — resolver v2.

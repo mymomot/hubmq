@@ -54,7 +54,7 @@
 
 | Phase | Durée | Scope | État |
 |---|---|---|---|
-| Phase Core | 5j | LAN only, Telegram polling, fallback email direct | EN COURS (Task 5/23 DONE) |
+| Phase Core | 5j | LAN only, Telegram polling, fallback email direct | EN COURS (Task 6/23 DONE) |
 | Phase Exposure | 2j | ntfy public, Telegram webhook Internet | À VENIR |
 
 ## Commits
@@ -64,6 +64,7 @@
 | `9bafca6` | init: hubmq workspace skeleton + Phase Core plan |
 | `1a2d41a` | feat(nats): JetStream config template + systemd unit + NKeys doc |
 | `19a6bf9` | feat(core): config loader TOML avec defaults + 2 tests TDD |
+| `a55abda` | feat(core): canonical Message + Severity enum with Wazuh mapping |
 
 ## Tasks Phase Core — Suivi
 
@@ -72,4 +73,5 @@
 - [x] Task 3 : NKeys générées, config finale, NATS LIVE
 - [ ] Task 4 : Cargo workspace skeleton (hubmq-core + hubmq-bin stubs)
 - [x] Task 5 : `config.rs` TOML loader — sections nats/smtp/telegram/filter/fallback/bridge/ntfy, defaults credentials par nom, `Config::from_file()`, 2 tests TDD PASS, clippy 0 warning (commit `19a6bf9`)
-- [ ] Task 6→23 : implémentation Rust hubmq (voir plan)
+- [x] Task 6 : `message.rs` — `Severity` enum (P0-P3) + `from_wazuh_level()` (≥12=P0, 8-11=P1, 5-7=P2, <5=P3) + `bypasses_quiet_hours()` (P0+P1=true) + `Message` struct (id/ts/source/severity/title/body/tags/dedup_key/meta) + `Message::new()` + `dedup_hash()` SHA256. 3 tests TDD PASS, clippy 0 warning (commit `a55abda`)
+- [ ] Task 7→23 : implémentation Rust hubmq (voir plan)
