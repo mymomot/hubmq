@@ -1,0 +1,21 @@
+name: Deploy
+on:
+  push: {branches: [main]}
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, linux, x64, lxc-500]
+    needs: []
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo build --release
+      - name: Deploy to LXC 415
+        env:
+          TARGET_HOST: hubmq
+        run: bash deploy/deploy-hubmq.sh target/release/hubmq
+      - name: Smoke test
+        run: |
+          sleep 5
+          curl -sf http://192.168.10.15:8470/health
+          ssh hubmq "sudo systemctl is-active hubmq.service"

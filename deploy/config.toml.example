@@ -1,0 +1,35 @@
+[nats]
+url = "nats://localhost:4222"
+nkey_seed_path = "/etc/nats/nkeys/hubmq-service.nk"
+
+[smtp]
+host = "smtp.gmail.com"
+port = 587
+username = "mymomot74@gmail.com"
+from = "HubMQ Lab <mymomot74@gmail.com>"
+password_credential = "gmail-app-password"
+
+[telegram]
+allowed_chat_ids = []  # fill with your chat_id
+token_credential = "telegram-bot-token"
+
+[filter]
+dedup_window_secs = 60
+rate_limit_per_min = 10
+rate_limit_p0_per_min = 100
+quiet_hours_start = "22:00"
+quiet_hours_end = "07:00"
+
+[fallback]
+email_to = "motreff@gmail.com"
+heartbeat_silence_max_secs = 10800
+
+[bridge]
+msg_relay_url = "http://192.168.10.99:9480"
+command_whitelist = ["status", "logs", "help"]
+
+[ntfy]
+# Phase Core: LAN only, empty = disabled
+# base_url = "http://localhost:2586"
+# topic = "hubmq-alerts"
+# bearer_credential = "ntfy-bearer"

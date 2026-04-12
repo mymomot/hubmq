@@ -1,0 +1,26 @@
+name: CI
+on:
+  push: {branches: [main]}
+  pull_request:
+
+jobs:
+  test:
+    runs-on: [self-hosted, linux, x64, lxc-500]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: hubmq-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo fmt -- --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test --all
+      - run: cargo build --release
+      - name: Upload binary
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with: {name: hubmq, path: target/release/hubmq}
