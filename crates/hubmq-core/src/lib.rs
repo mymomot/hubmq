@@ -1,5 +1,6 @@
 pub mod app_state;
 pub mod bridge;
+pub mod dispatcher;
 pub mod audit;
 pub mod config;
 pub mod filter;
