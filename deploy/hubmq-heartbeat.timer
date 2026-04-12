@@ -1,0 +1,10 @@
+[Unit]
+Description=HubMQ heartbeat — detect 3h silence
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=1h
+Unit=hubmq-heartbeat.service
+
+[Install]
+WantedBy=timers.target

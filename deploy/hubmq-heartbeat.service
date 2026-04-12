@@ -1,0 +1,7 @@
+[Unit]
+Description=HubMQ heartbeat probe
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c 'curl -fs http://localhost:8470/health > /dev/null || /usr/local/bin/hubmq-fallback-p0.sh'

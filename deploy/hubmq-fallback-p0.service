@@ -1,0 +1,8 @@
+[Unit]
+Description=HubMQ P0 fallback (direct email when HubMQ is down)
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/hubmq-fallback-p0.sh
+Environment=HUBMQ_FALLBACK_TO=motreff@gmail.com
