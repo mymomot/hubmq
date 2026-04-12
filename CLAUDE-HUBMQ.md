@@ -4,11 +4,65 @@
 
 ## Statut projet
 
-- **Phase** : Phase Core — **CODE COMPLETE** (implementation + tests + deploy DONE, daemon pending first-time deploy)
+- **Phase** : Phase Core — **LIVE** (2026-04-12, daemon running on LXC 415, end-to-end validated)
 - **LXC** : 415 — `192.168.10.15` — Debian 13 — 2 vCPU / 2 GB RAM / 20 GB disk
 - **SSH** : `ssh hubmq` (motreffs, sudo NOPASSWD)
-- **Git** : `motreffs/hubmq` on Forgejo `localhost:3000` | main branch | 23 commits (Phase Core DONE)
+- **Git** : `motreffs/hubmq` on Forgejo `localhost:3000` | mirror `github.com/mymomot/hubmq` (sync_on_commit) | main branch
 - **Tests** : 33 tests PASS + 2 ignored | clippy 0 warnings | `cargo test --lib` PASS
+- **End-to-end** : HTTP ingestion → NATS → dispatcher → Apprise Telegram → DM received ✓
+
+## Bot Telegram
+
+| Champ | Valeur |
+|---|---|
+| **Bot name** | `mymomot_hubmq_bot` (display) |
+| **Bot username** | [`@hubmqbot`](https://t.me/hubmqbot) |
+| **Bot ID** | `8730722475` |
+| **Token storage** | `/etc/hubmq/credentials/telegram-bot-token` (chmod 600 root:root) — JAMAIS dans git |
+| **Authorized chat_id** | `1451527482` (Stephane Momo) — unique allowlist dans `/etc/hubmq/config.toml` |
+| **Mode** | Polling (long polling `getUpdates`) — pas de webhook en Phase Core |
+| **Privacy settings** | `/setprivacy → Disable` + `/setjoingroups → Disable` recommandés via `@BotFather` |
+
+### Usage bidirectionnel
+
+**Downstream (HubMQ → toi)** — alertes filtrées par severity :
+- P0 → immédiat (email + ntfy + Telegram) — bypass quiet hours
+- P1 → Telegram + push — bypass quiet hours
+- P2 → email digest hors quiet hours
+- P3 → log only
+
+Envoi via Apprise URL `tgram://${TOKEN}/${CHAT_ID}` → API Telegram `sendMessage`.
+
+**Upstream (toi → HubMQ → agents)** — commandes autorisées seulement :
+- Whitelist par défaut : `["status", "logs", "help"]` (config `[bridge].command_whitelist`)
+- Autres messages : ingérés dans stream NATS `USER_IN` pour audit, mais **non forwardés** à msg-relay (audit `bridge_command_rejected`)
+- Forwards Telegram : **rejetés** (B2 SecurityAuditor) pour éviter usurpation chat_id
+
+### Tests de vie
+
+```bash
+# Valider token
+curl -sS "https://api.telegram.org/bot${TOKEN}/getMe" | jq
+
+# Voir les updates reçus
+curl -sS "https://api.telegram.org/bot${TOKEN}/getUpdates" | jq
+
+# Envoyer manuellement une DM (bypass HubMQ)
+curl -sS "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+  -d chat_id=1451527482 \
+  -d text="Test direct"
+
+# Ingérer une alerte P1 via HubMQ (déclenche Telegram)
+curl -sS -X POST http://192.168.10.15:8470/in/generic \
+  -H "Content-Type: application/json" \
+  -d '{"source":"test","severity":"P1","title":"Test","body":"via HubMQ","tags":[]}'
+```
+
+### Rotation token
+
+1. `@BotFather → /revoke` → select `@hubmqbot` → confirm → nouveau token
+2. `printf 'NEW_TOKEN' | ssh hubmq "sudo tee /etc/hubmq/credentials/telegram-bot-token && sudo chmod 600 /etc/hubmq/credentials/telegram-bot-token"`
+3. `ssh hubmq "sudo systemctl restart hubmq.service"`
 
 ## Vue d'ensemble
 

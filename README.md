@@ -9,18 +9,30 @@
 
 ## Status
 
-**Phase Core — CODE COMPLETE (2026-04-12)** — deploy pending Telegram bot token.
+**Phase Core — LIVE (2026-04-12)** — end-to-end validated.
 
-- ✅ 23/23 tasks implemented (13 commits, 31 tests PASS + 2 ignored, 0 clippy warnings)
+- ✅ 23/23 tasks implemented (33 tests PASS + 2 ignored, 0 clippy warnings)
 - ✅ LXC 415 HubMQ LIVE (192.168.10.15, Debian 13, 2 vCPU / 2 GB / 20 GB)
 - ✅ NATS JetStream v2.10.24 LIVE (6 streams with explicit limits)
 - ✅ NATS-NUI web interface at [nui.lab.mymomot.ovh](https://nui.lab.mymomot.ovh)
 - ✅ SMTP Gmail validated (`mymomot74@gmail.com` App Password)
 - ✅ Wazuh agent 010 Active (FIM + audit log)
-- ⏳ hubmq daemon not yet deployed (waits for Telegram bot token + config.toml)
+- ✅ **Telegram bot [`@hubmqbot`](https://t.me/hubmqbot) LIVE** — polling mode, chat_id allowlist, forward rejection
+- ✅ **hubmq daemon LIVE** on LXC 415 — `systemctl status hubmq.service` → active
+- ✅ **End-to-end validated** : `POST /in/generic severity=P1` → Telegram DM received
 - 📋 Phase Exposure planned (2 days) — ntfy public + Telegram webhook Internet
 
 ## Architecture — 2-phase approach
+
+## Telegram Bot
+
+- **Username** : [`@hubmqbot`](https://t.me/hubmqbot) (bot ID `8730722475`)
+- **Mode** : Polling (no Internet-facing webhook in Phase Core)
+- **Allowlist** : single `chat_id` declared in `/etc/hubmq/config.toml` → `[telegram] allowed_chat_ids = [...]`
+- **Security** : forwarded messages rejected (B2), unknown chat_id silently dropped with audit entry
+- **Upstream commands** : whitelist `["status", "logs", "help"]` in `[bridge] command_whitelist` → forwarded to `msg-relay` at `192.168.10.99:9480` → delivered to Claude Code
+- **Downstream alerts** : delivered via Apprise `tgram://TOKEN/CHAT_ID` when severity routing picks Telegram channel (P0 always, P1 always, P2 outside quiet hours)
+- **Token storage** : `/etc/hubmq/credentials/telegram-bot-token` (chmod 600 root:root, via systemd `LoadCredential`) — never in git
 
 **Phase Core (LAN only)** — this repo :
 - NATS JetStream bus internal to LXC 415

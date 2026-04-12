@@ -66,10 +66,13 @@ impl Sink for AppriseSink {
     /// - Erreur d'écriture sur stdin
     /// - Exit code non-zéro du script Python (stderr inclus dans le message d'erreur)
     async fn deliver(&self, m: &Message) -> anyhow::Result<()> {
+        // Note: `tag` param is NOT passed here. In Apprise, `tag` filters WHICH destinations
+        // to notify (e.g. only URLs tagged "mobile"). Passing tags from messages would match
+        // no destination and cause notify() to silently return false (exit 1).
+        // Message tags are carried in title/body instead (handled upstream via Tera templates).
         let payload = json!({
             "title": m.title,
             "body": m.body,
-            "tag": m.tags.join(","),
         });
 
         // argv : ["-c", <script>, url1, url2, ...]
