@@ -5,5 +5,6 @@ pub mod filter;
 pub mod message;
 pub mod nats_conn;
 pub mod queue;
+pub mod sink;
 pub mod source;
 pub mod subjects;
