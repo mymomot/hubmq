@@ -1,7 +1,7 @@
 /// Dispatcher HubMQ — consomme les streams NATS JetStream et route vers les sinks.
 ///
 /// Deux boucles indépendantes via `tokio::select!` :
-/// - `run_downstream` : 4 consumers (ALERTS/MONITOR/SYSTEM/CRON) → délivrance aux sinks
+/// - `run_downstream` : 2 consumers (AGENTS/CRON) — ALERTS/MONITOR/SYSTEM sont archivés et consommés par BigBrother externe qui publie des digests curés sur AGENTS
 /// - `run_upstream`   : consumer USER_IN → bridge msg-relay (commandes Telegram entrantes)
 ///
 /// Aucun crash silencieux : toutes les erreurs de delivery sont loguées via `tracing::warn`.
@@ -46,17 +46,18 @@ impl Dispatcher {
         }
     }
 
-    /// Spawne 4 consumers JetStream (un par stream de sortie).
+    /// Spawne 2 consumers JetStream (AGENTS + CRON).
     ///
+    /// ALERTS/MONITOR/SYSTEM restent créés par `ensure_streams` pour archivage,
+    /// mais ne sont plus consommés ici — BigBrother les lit et publie des digests
+    /// curés sur le stream AGENTS avant délivrance aux sinks.
     /// Chaque consumer est exécuté dans sa propre tâche Tokio.
     /// La boucle principale attend indéfiniment (les erreurs de consumer sont loguées,
     /// pas propagées — pour ne pas couper les autres consumers).
     async fn run_downstream(self: Arc<Self>) -> anyhow::Result<()> {
         let streams = [
-            ("ALERTS",  "hubmq-alerts"),
-            ("MONITOR", "hubmq-monitor"),
-            ("SYSTEM",  "hubmq-system"),
-            ("CRON",    "hubmq-cron"),
+            ("AGENTS", "hubmq-agents"),
+            ("CRON",   "hubmq-cron"),
         ];
 
         for (stream_name, consumer_name) in streams {
