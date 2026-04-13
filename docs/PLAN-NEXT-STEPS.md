@@ -199,7 +199,22 @@ EOF
 
 ---
 
-## Phase 3 — BigBrother agent autonome (~4h)
+## Phase 3 — BigBrother agent autonome — ✅ DONE 2026-04-13
+
+**Livrables** :
+- `~/.bigbrother-agent/workspace/CLAUDE.md` + `.claude/settings.json` (permissions.deny stricts)
+- `~/.bigbrother-agent/wrapper/bigbrother-analyze.sh`
+- `/etc/systemd/system/bigbrother-analyze.{service,timer}` (OnUnitActiveSec=1h, Persistent=true)
+- `crates/hubmq-core/src/dispatcher.rs` : `streams=[AGENTS,CRON]` (commit `5cbabe9`, deploy #29)
+- Dry-run : AGENTS → DM Telegram ✓, ALERTS archive-only ✓, BB manual run 28s verdict RAS correct
+
+**Réserve Phase 4 (documentée par Auditeur)** : si BigBrother tombe, ALERTS brutes P0 restent en NATS mais n'atteignent plus Telegram → fenêtre aveugle. Watchdog `agent.bigbrother.alive` + fallback direct P0 requis avant prod.
+
+**Backlog P3.7 identifié** : vault-mem MCP non accessible au jumeau sandboxé → notes RAS non persistées.
+
+---
+
+## Phase 3 (plan d'origine archivé) — BigBrother agent autonome (~4h)
 
 Objectif : avoir un observateur intelligent qui lit les streams bruts ALERTS/MONITOR/SYSTEM, corrèle, juge pertinence, publie des résumés curés sur stream AGENTS (qui sera le seul consumé par hubmq pour Telegram).
 
