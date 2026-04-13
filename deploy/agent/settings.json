@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "deny": [
+      "Write(/home/motreffs/CLAUDE.md)",
+      "Edit(/home/motreffs/CLAUDE.md)",
+      "MultiEdit(/home/motreffs/CLAUDE.md)",
+      "Write(/home/motreffs/CONSTITUTION.md)",
+      "Edit(/home/motreffs/CONSTITUTION.md)",
+      "MultiEdit(/home/motreffs/CONSTITUTION.md)",
+      "Write(/home/motreffs/.claude/agents/**)",
+      "Edit(/home/motreffs/.claude/agents/**)",
+      "MultiEdit(/home/motreffs/.claude/agents/**)",
+      "Write(/home/motreffs/.claude/skills/**)",
+      "Edit(/home/motreffs/.claude/skills/**)",
+      "MultiEdit(/home/motreffs/.claude/skills/**)",
+      "Write(/home/motreffs/.claude/settings.json)",
+      "Edit(/home/motreffs/.claude/settings.json)",
+      "Bash(rm -rf*)",
+      "Bash(sudo rm -rf*)",
+      "Bash(systemctl stop hubmq*)",
+      "Bash(systemctl disable*)",
+      "Bash(sudo systemctl stop hubmq*)",
+      "Bash(sudo systemctl disable*)",
+      "Bash(git push*)",
+      "Bash(docker rm*)",
+      "Bash(sudo docker rm*)"
+    ]
+  }
+}
