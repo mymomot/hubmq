@@ -4,12 +4,15 @@
 
 ## Statut projet
 
-- **Phase** : Phase Core — **LIVE** (2026-04-12, daemon running on LXC 415, end-to-end validated)
+- **Phase Core** : **LIVE** (2026-04-12, daemon `hubmq.service` sur LXC 415, E2E validé)
+- **claude-hubmq jumeau** : **LIVE** (2026-04-13 05:45, listener systemd `hubmq-agent-listener.service` sur LXC 500, E2E validé en ~60s)
 - **LXC** : 415 — `192.168.10.15` — Debian 13 — 2 vCPU / 2 GB RAM / 20 GB disk
 - **SSH** : `ssh hubmq` (motreffs, sudo NOPASSWD)
 - **Git** : `motreffs/hubmq` on Forgejo `localhost:3000` | mirror `github.com/mymomot/hubmq` (sync_on_commit) | main branch
-- **Tests** : 33 tests PASS + 2 ignored | clippy 0 warnings | `cargo test --lib` PASS
-- **End-to-end** : HTTP ingestion → NATS → dispatcher → Apprise Telegram → DM received ✓
+- **Tests** : 33 tests PASS + 2 ignored | clippy 0 warnings
+- **End-to-end** :
+  - Downstream : POST `/in/generic` severity=P1 → NATS → dispatcher → Apprise Telegram → DM ✓
+  - Upstream bidirectionnel : @hubmqbot message → NATS USER_IN → listener → spawn claude-hubmq → réponse Telegram ✓
 
 ## Bot Telegram
 
@@ -244,9 +247,12 @@ HubMQ is a **communication hub** that:
 
 | Phase | Durée | État | Scope |
 |---|---|---|---|
-| **Phase Core** | ~2 jours | ✅ CODE COMPLETE | LAN only, Telegram polling, local fallback, 6 NATS streams |
-| **Phase Exposure** | ~1 jour | ⬜ À VENIR | ntfy public, Telegram webhook, Bearer auth, limits raised |
-| **Phase Monitoring** | TBD | 📋 Planification | Métriques Prometheus, dashboards Grafana |
+| **Phase Core** | 2j | ✅ LIVE (2026-04-12) | LAN only, Telegram polling, fallback email local, 6 streams NATS, E2E validé |
+| **claude-hubmq jumeau** | 3h | ✅ LIVE (2026-04-13) | Clone Claude sandboxed, répond via @hubmqbot 24/7 |
+| **Phase 2 solidification** | ~3h | ⬜ À FAIRE | Lock anti-double, rotation session, Wazuh FIM, bridge bypass whitelist |
+| **Phase 3 BigBrother** | ~4h | 📋 Planification | Daemon cron consume ALERTS/MONITOR/SYSTEM → publish AGENTS curé |
+| **Phase Exposure** | 2j | 📋 Futur | ntfy public, Telegram webhook, conditions council B4+B5 |
+| **Phase Monitoring** | TBD | 📋 Futur | Métriques Prometheus, dashboards Grafana |
 
 ## Fichiers clés
 
@@ -255,15 +261,154 @@ HubMQ is a **communication hub** that:
 - **Config example** : `deploy/config.toml.example` (remplir allowed_chat_ids + telegram bot token)
 - **Tests** : 33 tests dans `crates/hubmq-core/src/` (dedup, ratelimit, severity, email, ntfy, webhook, telegram, SQLite, etc.)
 
-## Reste à faire (Deploy + Phase Exposure)
+## Intégrations sources (à brancher progressivement)
 
-1. **First-time daemon deploy** :
-   - `cargo build --release -p hubmq`
-   - `bash deploy/deploy-hubmq.sh target/release/hubmq`
-   - Fill `/etc/hubmq/credentials/telegram-bot-token` (from @BotFather)
-   - Edit `/etc/hubmq/config.toml` : allowed_chat_ids, SMTP password
-   - Verify health : `curl -sf http://192.168.10.15:8470/health`
+Ces sources publient vers `/in/*` HTTP ou directement NATS `alert.*` / `monitor.*` / `cron.*` :
+- **Wazuh** (LXC 412) : webhook config → `/in/wazuh` (script integration dispo)
+- **Forgejo CI** (LXC 500) : webhook repo settings → `/in/forgejo`
+- **BigBrother** (`~/scripts/health-check-services.sh` LXC 500) : à upgrader — publish NATS direct ou POST `/in/generic`
+- **systemd OnFailure** : hook unit files → POST `/in/generic`
+- **cron jobs** : ajouter `nats publish cron.<job>.<status>` en fin de script
 
-2. **Phase Exposure planning** : ntfy public, webhook Telegram, metrics
+---
 
-3. **Integrations** : wire up Wazuh, Forgejo, BigBrother, systemd, cron sources (HTTP webhooks)
+## claude-hubmq — Jumeau Claude Code (LIVE 2026-04-13)
+
+**Quoi** : clone comportemental de Claude principal, sandboxed, spawné à chaque message Telegram. Permet à Stéphane de converser avec "moi" 24/7 via `@hubmqbot`, même sans session Claude Code terminal active.
+
+### Architecture
+
+```
+Stéphane → @hubmqbot
+             ↓ (polling hubmq daemon LXC 415)
+         NATS stream USER_IN (user.incoming.telegram)
+             ↓
+         hubmq-agent-listener.service (LXC 500)
+             ↓ (nats sub --raw | while read)
+         hubmq-agent-spawn.sh
+             ↓ (inject thread vault-mem + prompt)
+         claude --continue --print --setting-sources user
+             ↓ (le jumeau raisonne avec MCP)
+         send-telegram.sh → API Telegram
+             ↓
+         DM reçue par Stéphane
+```
+
+### Workspace & charte
+
+- **Workspace** : `~/.hubmq-agent/workspace/` (CWD dédié → JSONL session séparée)
+- **CLAUDE.md (charter)** : identité, périmètre autorisé/interdit, flux opérationnel (voir `deploy/agent/CLAUDE-HUBMQ-AGENT.md`)
+- **Symlinks** : `.claude/agents` + `.claude/skills` → `~/.claude/` (mêmes agents + skills que Claude principal)
+- **Constitution** : symlink RO vers `~/CONSTITUTION.md`
+
+### Périmètre sandboxé (natif Claude Code `permissions.deny`)
+
+| Autorisé | Interdit |
+|---|---|
+| Lire `~/CLAUDE.md`, `~/CONSTITUTION.md` (référence) | Modifier `~/CLAUDE.md`, `~/CONSTITUTION.md`, `~/.claude/agents/**`, `~/.claude/skills/**` |
+| Modifier `~/.hubmq-agent/workspace/` | `git push`, `rm -rf`, `systemctl stop/disable hubmq*`, `docker rm` |
+| vault-mem R/W (section=conversations tag=thread) | Modifier settings Claude principal |
+| Tous les MCP (nexus, context7, sequentialthinking, desktop-agent) | Déploiements prod sans validation Stéphane |
+| Spawn agents (analyse/proposition uniquement) | |
+| Bash lecture (status, grep, nats sub, systemctl status, journalctl) | |
+| Réponse via `send-telegram.sh` | |
+
+### Partage contexte Claude principal ↔ jumeau
+
+Via vault-mem : `section=conversations tag=thread`
+- Claude principal lit au démarrage de session
+- Jumeau lit à chaque spawn (injecté dans prompt par le wrapper)
+- Chacun écrit ses synthèses (`author=Claude Code` vs `author=claude-hubmq` pour tracer)
+
+### Fichiers sur LXC 500
+
+**Dans le repo** (`deploy/agent/`) :
+- `CLAUDE-HUBMQ-AGENT.md` — charter jumeau
+- `settings.json` — permissions.deny
+- `hubmq-agent-spawn.sh` — wrapper spawn
+- `hubmq-agent-listener.sh` — listener daemon bash
+- `hubmq-agent-listener.service` — unit systemd
+- `send-telegram.sh` — helper API Telegram
+- `README.md` — doc déploiement complète
+
+**Runtime (hors git)** :
+```
+~/.hubmq-agent/
+├── workspace/              # CWD du jumeau
+│   ├── CLAUDE.md           # copie charter
+│   ├── CONSTITUTION.md     # symlink RO
+│   ├── .claude/
+│   │   ├── settings.json   # permissions.deny
+│   │   ├── agents/         # symlink ~/.claude/agents
+│   │   └── skills/         # symlink ~/.claude/skills
+│   └── memory/
+├── wrapper/                # scripts (copies locales)
+├── credentials/            # chmod 600
+│   ├── telegram-bot-token
+│   └── nats-hubmq-service.seed
+└── {listener,spawn}.log
+```
+
+### Vérification & troubleshooting
+
+```bash
+# Listener daemon
+sudo systemctl status hubmq-agent-listener.service
+tail -20 ~/.hubmq-agent/listener.log
+
+# Dernier spawn
+tail -20 ~/.hubmq-agent/spawn.log
+
+# Test manuel : publier un event NATS fake
+echo '{"id":"test","ts":"2026-04-13T...","source":"telegram","severity":"P2","title":"t","body":"test","tags":[],"meta":{"chat_id":"1451527482","message_id":"1"}}' | \
+  /usr/local/bin/nats publish user.incoming.telegram \
+  --nkey ~/.hubmq-agent/credentials/nats-hubmq-service.seed \
+  --server nats://192.168.10.15:4222 \
+  "$(cat)"
+# → le listener doit déclencher spawn → DM reçue sur Telegram
+
+# Process running
+ps aux | grep -E "claude.*--continue" | grep -v grep
+```
+
+---
+
+## Plan post-LIVE (Phase 2/3/Exposure)
+
+### Phase 2 — Solidification claude-hubmq (~2-3h cumul)
+
+1. **P1 — Anti-double-réponse** (lock file `/tmp/hubmq-claude.owner`) : Claude principal en session créé le lock, jumeau skip si présent
+2. **P2 — Rotation session** : dans `hubmq-agent-spawn.sh`, archiver JSONL si >24h inactivité (fresh session)
+3. **P3 — Wazuh FIM** : groupe `hubmq-agent` surveille `~/.hubmq-agent/workspace/` + credentials
+4. **P4 — Bypass whitelist bridge** (patch Rust `bridge.rs`) : si `chat_id ∈ allowed_chat_ids`, bypass filtre verbe
+
+### Phase 3 — BigBrother agent (~3-4h)
+
+Daemon séparé consumer NATS `ALERTS/MONITOR/SYSTEM` :
+- Timer systemd 1-6h → `claude-code-cli-skill.sh --mode audit`
+- Agrège, corrèle, juge pertinence
+- Si pertinent → publish NATS `agent.bigbrother.summary` sur stream AGENTS
+- hubmq dispatcher consume AGENTS → DM Telegram (patch Rust `dispatcher.rs` pour ajouter consumer AGENTS, retirer ALERTS/MONITOR/SYSTEM directs)
+
+### Phase Exposure (futur, 2j, pas urgent)
+
+- ntfy.sh exposé `ntfy.mymomot.ovh` via Traefik public
+- Telegram webhook au lieu de polling (latence 100ms → 50ms, gain marginal)
+- Rate limit Traefik + IP allowlist Telegram CIDR (conditions council B4/B5)
+
+### Limites connues (Phase Core + jumeau)
+
+- Pas de lock anti-double-réponse (P1 ci-dessus)
+- Latence spawn jumeau ~60s (contexte load + inférence Claude)
+- Coût API Anthropic par spawn (~20k tokens in + 2-5k out = ~0.10-0.25€/message)
+- Confusion de noms (hubmq=service, @hubmqbot=bot, claude-hubmq=jumeau, HubMQ=hostname) — validée par Stéphane comme acceptable
+
+### Identité dans vault-mem
+
+| Author | Qui |
+|---|---|
+| `Claude Code` | Claude principal (moi, session terminal) |
+| `claude-hubmq` | Le jumeau |
+| `BigBrother` | Monitoring scripts + futur daemon Phase 3 |
+
+Distinguer les auteurs permet à Claude principal d'auditer/valider ce que le jumeau a dit en son absence.
