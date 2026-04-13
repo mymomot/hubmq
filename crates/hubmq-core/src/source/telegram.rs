@@ -126,13 +126,23 @@ async fn handle(
     m.meta.insert("message_id".into(), msg.id.0.to_string());
     // Injection du nom du bot pour le routage multi-sink dans le dispatcher
     m.meta.insert("bot_name".into(), bot_entry.name.clone());
+    m.meta.insert("target_agent".into(), bot_entry.target_agent.clone());
+
+    // Routage par target_agent :
+    // - claude-hubmq (historique) → user.incoming.telegram (jumeau listener existant)
+    // - autres agents (llmcore, etc.) → user.inbox.<agent> (listeners llm-openai-compat)
+    let publish_subject: String = if bot_entry.target_agent == "claude-hubmq" {
+        Subject::user_incoming_telegram().to_string()
+    } else {
+        format!("user.inbox.{}", bot_entry.target_agent)
+    };
 
     // Publication NATS JetStream
     let payload = serde_json::to_vec(&m)?;
     state
         .nats
         .js
-        .publish(Subject::user_incoming_telegram(), payload.into())
+        .publish(publish_subject.clone(), payload.into())
         .await?;
 
     // Audit de réception
@@ -141,7 +151,7 @@ async fn handle(
         .log(
             "telegram_message_received",
             Some(&chat_id.to_string()),
-            Some("user.incoming.telegram"),
+            Some(&publish_subject),
             &serde_json::json!({"len": text.len(), "id": m.id.to_string(), "bot": bot_entry.name}),
         )
         .await
