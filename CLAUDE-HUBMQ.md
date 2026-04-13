@@ -6,7 +6,7 @@
 
 - **Phase Core** : **LIVE** (2026-04-12, daemon `hubmq.service` sur LXC 415, E2E validé)
 - **claude-hubmq jumeau** : **LIVE** (2026-04-13 05:45, listener systemd `hubmq-agent-listener.service` sur LXC 500, E2E validé en ~60s)
-- **Phase 2.4 DONE** (2026-04-13 06:30) : bridge bypass whitelist verbe pour chat_id allowlisté. Stéphane peut envoyer messages libres à `@hubmqbot` (commits `e78fd42` patch + `329b78f` fix typo nkey_seed_path révélé au 1er deploy CI réussi)
+- **Phase 2.4 DONE** (2026-04-13) : bridge bypass whitelist verbe pour chat_id allowlisté. Stéphane peut envoyer messages libres à `@hubmqbot`. Commits : `e78fd42` patch bypass + `329b78f` fix typo nkey_seed_path + `08b57f8` bridge bearer auth msg-relay (P0 fix 401) + `744082f` fix deploy `[ -f ]` sans sudo écrasait config.toml + `05e72c0` OnFailure misplaced (B1 fallback enfin actif)
 - **LXC** : 415 — `192.168.10.15` — Debian 13 — 2 vCPU / 2 GB RAM / 20 GB disk
 - **SSH** : `ssh hubmq` (motreffs, sudo NOPASSWD)
 - **Git** : `motreffs/hubmq` on Forgejo `localhost:3000` | mirror `github.com/mymomot/hubmq` (sync_on_commit) | main branch
