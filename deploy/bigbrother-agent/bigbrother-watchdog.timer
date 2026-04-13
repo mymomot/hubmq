@@ -1,0 +1,11 @@
+[Unit]
+Description=BigBrother watchdog — check toutes les 30min
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+Unit=bigbrother-watchdog.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

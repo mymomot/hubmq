@@ -208,9 +208,19 @@ EOF
 - `crates/hubmq-core/src/dispatcher.rs` : `streams=[AGENTS,CRON]` (commit `5cbabe9`, deploy #29)
 - Dry-run : AGENTS → DM Telegram ✓, ALERTS archive-only ✓, BB manual run 28s verdict RAS correct
 
-**Réserve Phase 4 (documentée par Auditeur)** : si BigBrother tombe, ALERTS brutes P0 restent en NATS mais n'atteignent plus Telegram → fenêtre aveugle. Watchdog `agent.bigbrother.alive` + fallback direct P0 requis avant prod.
-
 **Backlog P3.7 identifié** : vault-mem MCP non accessible au jumeau sandboxé → notes RAS non persistées.
+
+## Phase 4 — Watchdog BigBrother — ✅ DONE 2026-04-13
+
+**Livrables** :
+- `bigbrother-analyze.sh` : publish heartbeat `agent.bigbrother.heartbeat` (severity P3 log_only) à chaque run DONE
+- `bigbrother-watchdog.sh` : détecte BB silencieux >2h ET ALERTS non vide → DM direct via `send-telegram.sh` + audit NATS `agent.watchdog.alert` (severity P3)
+- `/etc/systemd/system/bigbrother-watchdog.{service,timer}` — timer 30min, dédup 1h, fallback parse `analyze.log` si NATS stream subjects échoue
+- Scripts versionnés dans `deploy/bigbrother-agent/` du repo hubmq (reproductible)
+- Test nominal : BB vivant → RAS ✓
+- Test négatif : simulation BB silencieux 3h + ALERTS=6 msgs → watchdog détecte + publish audit + tente DM ✓
+
+**Fenêtre aveugle fermée** — prêt pour Phase 5 / prod réelle.
 
 ---
 

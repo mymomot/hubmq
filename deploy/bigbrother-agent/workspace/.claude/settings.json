@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(systemctl is-active *)",
+      "Bash(systemctl status *)",
+      "Bash(journalctl *)",
+      "Bash(curl *)",
+      "Bash(nats *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(grep *)",
+      "Bash(date *)"
+    ],
+    "deny": [
+      "Write(/home/motreffs/CLAUDE.md)",
+      "Edit(/home/motreffs/CLAUDE.md)",
+      "Write(/home/motreffs/CONSTITUTION.md)",
+      "Edit(/home/motreffs/CONSTITUTION.md)",
+      "Write(/home/motreffs/.claude/**)",
+      "Edit(/home/motreffs/.claude/**)",
+      "Write(/home/motreffs/projects/**)",
+      "Edit(/home/motreffs/projects/**)",
+      "Bash(rm -rf*)",
+      "Bash(systemctl stop*)",
+      "Bash(systemctl disable*)",
+      "Bash(systemctl restart*)",
+      "Bash(git *)",
+      "Bash(docker *)",
+      "Bash(sudo *)"
+    ],
+    "defaultMode": "acceptEdits"
+  }
+}

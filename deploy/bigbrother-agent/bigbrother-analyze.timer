@@ -1,0 +1,11 @@
+[Unit]
+Description=BigBrother — trigger analyse monitoring toutes les heures
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=1h
+Unit=bigbrother-analyze.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

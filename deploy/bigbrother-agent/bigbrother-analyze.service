@@ -1,0 +1,17 @@
+[Unit]
+Description=BigBrother — analyse monitoring transversale via Claude CLI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=motreffs
+Group=motreffs
+Environment=HOME=/home/motreffs
+Environment=PATH=/home/motreffs/.local/bin:/usr/local/bin:/usr/bin:/bin
+WorkingDirectory=/home/motreffs/.bigbrother-agent/workspace
+ExecStart=/home/motreffs/.bigbrother-agent/wrapper/bigbrother-analyze.sh
+StandardOutput=append:/home/motreffs/.bigbrother-agent/logs/systemd.log
+StandardError=append:/home/motreffs/.bigbrother-agent/logs/systemd.log
+# Hardening limité (Claude CLI a besoin du filesystem user)
+NoNewPrivileges=yes
