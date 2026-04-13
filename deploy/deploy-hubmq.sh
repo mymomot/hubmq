@@ -28,7 +28,9 @@ sudo install -m 644 /tmp/hubmq-heartbeat.service /etc/systemd/system/
 sudo install -m 644 /tmp/hubmq-heartbeat.timer /etc/systemd/system/
 
 # Install config if missing
-[ -f /etc/hubmq/config.toml ] || sudo install -m 640 -o root -g hubmq /tmp/config.toml.example /etc/hubmq/config.toml
+# NB: sudo test -f requis car /etc/hubmq est 0640 root:hubmq — motreffs ne peut pas stat le fichier
+# sans sudo. Un simple `[ -f ]` retournait toujours false et écrasait le config de prod à chaque deploy.
+sudo test -f /etc/hubmq/config.toml || sudo install -m 640 -o root -g hubmq /tmp/config.toml.example /etc/hubmq/config.toml
 
 sudo systemctl daemon-reload
 sudo systemctl enable hubmq.service hubmq-heartbeat.timer
