@@ -15,6 +15,7 @@ Environment=HUBMQ_CONFIG=/etc/hubmq/config.toml
 # D3 — systemd LoadCredential (files remain root:root 600, service sees them via $CREDENTIALS_DIRECTORY)
 LoadCredential=gmail-app-password:/etc/hubmq/credentials/gmail-app-password
 LoadCredential=telegram-bot-token:/etc/hubmq/credentials/telegram-bot-token
+LoadCredential=msg-relay-token:/etc/hubmq/credentials/msg-relay-token
 
 ExecStart=/usr/local/bin/hubmq
 Restart=always

@@ -92,6 +92,9 @@ pub struct BridgeConfig {
     /// Liste blanche des commandes acceptées depuis le pont.
     #[serde(default)]
     pub command_whitelist: Vec<String>,
+    /// Nom du credential secret pour l'authentification bearer vers msg-relay.
+    #[serde(default)]
+    pub bearer_credential: Option<String>,
 }
 
 /// Notifications ntfy.sh (optionnel).

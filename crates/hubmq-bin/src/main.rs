@@ -104,7 +104,13 @@ async fn main() -> anyhow::Result<()> {
     let telegram_apprise: Arc<dyn Sink> = Arc::new(AppriseSink::new(tg_urls));
 
     // Bridge msg-relay (optionnel — désactivé si msg_relay_url absent)
-    let bridge = Bridge::new(&cfg.bridge);
+    // Résolution du bearer credential si configuré (pattern identique à ntfy)
+    let bridge_bearer = cfg
+        .bridge
+        .bearer_credential
+        .as_ref()
+        .and_then(|c| read_credential(&creds_dir, c).ok());
+    let bridge = Bridge::new(&cfg.bridge, bridge_bearer);
 
     let dispatcher = Arc::new(Dispatcher {
         state: state.clone(),

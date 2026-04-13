@@ -31,15 +31,20 @@ pub struct Bridge {
     url: Option<String>,
     /// Liste des commandes (premier token) acceptées.
     whitelist: Vec<String>,
+    /// Token bearer pour l'authentification vers msg-relay (optionnel).
+    bearer: Option<String>,
 }
 
 impl Bridge {
     /// Construit un `Bridge` depuis la section `BridgeConfig`.
-    pub fn new(cfg: &BridgeConfig) -> Self {
+    ///
+    /// `bearer` : valeur résolue du credential (pas le nom du fichier) — `None` si absent.
+    pub fn new(cfg: &BridgeConfig, bearer: Option<String>) -> Self {
         Self {
             client: Client::new(),
             url: cfg.msg_relay_url.clone(),
             whitelist: cfg.command_whitelist.clone(),
+            bearer,
         }
     }
 
@@ -136,13 +141,16 @@ impl Bridge {
             "meta": m.meta,
         });
 
-        let resp = self
+        let mut req = self
             .client
             .post(format!("{}/send", url.trim_end_matches('/')))
-            .json(&body)
-            .send()
-            .await
-            .context("msg-relay HTTP POST")?;
+            .json(&body);
+
+        if let Some(token) = &self.bearer {
+            req = req.bearer_auth(token);
+        }
+
+        let resp = req.send().await.context("msg-relay HTTP POST")?;
 
         if !resp.status().is_success() {
             anyhow::bail!("msg-relay a retourné {}", resp.status());
@@ -223,6 +231,7 @@ mod tests {
             client: Client::new(),
             url: Some("http://localhost:9480".into()),
             whitelist: whitelist.into_iter().map(String::from).collect(),
+            bearer: None,
         }
     }
 
@@ -323,5 +332,33 @@ mod tests {
         let d = bridge.decide(&cfg, &m);
         assert!(d.forward);
         assert!(!d.bypassed, "whitelist verbe prend la priorité sur le bypass chat_id");
+    }
+
+    #[test]
+    fn with_bearer_stores_token() {
+        // Bridge construit avec un token bearer → self.bearer est bien renseigné
+        let cfg_bridge = BridgeConfig {
+            msg_relay_url: Some("http://192.168.10.99:9480".into()),
+            command_whitelist: vec!["status".into()],
+            bearer_credential: Some("msg-relay-token".into()),
+        };
+        let bridge = Bridge::new(&cfg_bridge, Some("secret-token-xyz".into()));
+        assert_eq!(
+            bridge.bearer.as_deref(),
+            Some("secret-token-xyz"),
+            "le token bearer doit être stocké dans self.bearer"
+        );
+    }
+
+    #[test]
+    fn without_bearer_stores_none() {
+        // Bridge construit sans bearer → self.bearer est None
+        let cfg_bridge = BridgeConfig {
+            msg_relay_url: Some("http://192.168.10.99:9480".into()),
+            command_whitelist: vec![],
+            bearer_credential: None,
+        };
+        let bridge = Bridge::new(&cfg_bridge, None);
+        assert!(bridge.bearer.is_none(), "sans credential configuré, bearer doit être None");
     }
 }

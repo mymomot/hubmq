@@ -27,6 +27,9 @@ heartbeat_silence_max_secs = 10800
 [bridge]
 msg_relay_url = "http://192.168.10.99:9480"
 command_whitelist = ["status", "logs", "help"]
+# bearer_credential : nom du credential systemd LoadCredential pour Authorization: Bearer.
+# Si défini → /etc/hubmq/credentials/<name> doit exister (chmod 600 root:root). Sinon → headers absent → 401 si msg-relay exige auth.
+bearer_credential = "msg-relay-token"
 
 [ntfy]
 # Phase Core: LAN only, empty = disabled
