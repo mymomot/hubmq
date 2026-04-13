@@ -1,6 +1,6 @@
 [nats]
 url = "nats://localhost:4222"
-nkey_seed_path = "/etc/nats/nkeys/hubmq-service.nk"
+nkey_seed_path = "/etc/nats/nkeys/hubmq-service.seed"
 
 [smtp]
 host = "smtp.gmail.com"
