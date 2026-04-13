@@ -375,7 +375,12 @@ ps aux | grep -E "claude.*--continue" | grep -v grep
 
 ## Plan post-LIVE (Phase 2/3/Exposure)
 
-### Phase 2 — Solidification claude-hubmq (~2-3h cumul)
+> **📋 Plan opérationnel détaillé** (commandes, diffs, tests, ordre d'exécution) :
+> → [`docs/PLAN-NEXT-STEPS.md`](docs/PLAN-NEXT-STEPS.md)
+>
+> Cette section donne la vue d'ensemble. Pour reprendre le travail, ouvrir `PLAN-NEXT-STEPS.md` qui contient les livrables précis phase par phase (P2.1 → P3.6 → PX.1 → PX.2 → PM.1 → PM.3).
+
+### Phase 2 — Solidification claude-hubmq (~3h cumul)
 
 1. **P1 — Anti-double-réponse** (lock file `/tmp/hubmq-claude.owner`) : Claude principal en session créé le lock, jumeau skip si présent
 2. **P2 — Rotation session** : dans `hubmq-agent-spawn.sh`, archiver JSONL si >24h inactivité (fresh session)
