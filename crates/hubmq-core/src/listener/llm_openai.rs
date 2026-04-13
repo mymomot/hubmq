@@ -4,7 +4,7 @@
 /// 1. Subscribe pull consumer durable sur `agent.listener_subject`
 /// 2. Pour chaque message : POST `agent.endpoint` avec body OpenAI-compat
 /// 3. Parse `.choices[0].message.content`
-/// 4. Publish réponse sur `agent.<agent.name>.response` (severity P2)
+/// 4. Publish réponse sur `agent.<agent.name>.response` (severity P1)
 /// 5. Ack NATS **après** publish réponse (at-least-once, pas de perte)
 ///
 /// Gestion d'erreurs :
@@ -282,9 +282,11 @@ async fn publish_response(
         meta.insert("chat_id".into(), chat_id.clone());
     }
 
+    // P1 : réponse conversationnelle utilisateur — bypass quiet hours, delivery immédiate
+    // (P2 tomberait en log_only la nuit entre 22h-07h config quiet).
     let mut resp_msg = Message::new(
         format!("agent.{}", agent_name),
-        Severity::P2,
+        Severity::P1,
         format!("réponse {} pour {}", agent_name, original.title),
         response_text,
     );
