@@ -4,6 +4,8 @@ Documentation=http://localhost:3000/motreffs/hubmq
 After=network-online.target nats.service
 Requires=nats.service
 Wants=network-online.target
+# B1 — fallback on repeated failure (OnFailure appartient à [Unit], pas [Service])
+OnFailure=hubmq-fallback-p0.service
 
 [Service]
 Type=simple
@@ -20,9 +22,6 @@ LoadCredential=msg-relay-token:/etc/hubmq/credentials/msg-relay-token
 ExecStart=/usr/local/bin/hubmq
 Restart=always
 RestartSec=5
-
-# B1 — fallback on repeated failure
-OnFailure=hubmq-fallback-p0.service
 
 # Hardening
 ProtectSystem=strict
