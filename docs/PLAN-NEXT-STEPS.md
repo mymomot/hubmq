@@ -30,9 +30,24 @@ Vue d'ensemble & statut dans `CLAUDE-HUBMQ.md` à la racine.
 - 7 tests unitaires (bypass + régression non-allowlisté) — workspace 38/38 PASS, clippy clean
 - Commits : `e78fd42` patch + `329b78f` fix typo `nkey_seed_path` (révélé au 1er deploy CI réussi run #20)
 
+### Bugs latents révélés au 1er deploy CI complet (2026-04-13)
+- `08b57f8` **bridge bearer auth msg-relay** : support `Authorization: Bearer` via `BridgeConfig.bearer_credential` (pattern NtfyConfig + LoadCredential). Token `/etc/hubmq/credentials/msg-relay-token`. Sans ce fix → 401 systématique sur forward.
+- `744082f` **fix deploy [ -f ] sans sudo** : `[ -f /etc/hubmq/config.toml ]` sans sudo → motreffs no access → test false → `|| install` écrasait config à chaque deploy. Fix `sudo test -f`.
+- `05e72c0` **fix OnFailure misplaced** : directive `OnFailure=` dans `[Service]` au lieu de `[Unit]` → silencieusement ignorée → B1 fallback P0 jamais déclenché depuis origine du fichier.
+
+### P2.1 + P2.2 — Lock anti-double + rotation session JSONL (2026-04-13, LIVE)
+- `deploy/agent/hubmq-agent-spawn.sh` : check `/tmp/hubmq-claude.owner` en tête (TTL 1h, stale cleanup) + rotation JSONL si mtime >24h (archive `~/tmp/hubmq-claude-archive/`)
+- `~/.claude/settings.json` Claude principal : hook `SessionStart` + `UserPromptSubmit` → `touch $LOCK`, `SessionEnd` → `rm $LOCK`
+- Cron `/etc/cron.d/hubmq-claude-archive-cleanup` : purge archives JSONL >30j
+
+### P2.3 — Wazuh FIM hubmq-agent (2026-04-13, LIVE)
+- Groupe Wazuh `hubmq-agent` créé, agent 002 `forge-lxc500` joint (groupes `default, forge, hubmq-agent`)
+- FIM realtime sur : `~/.hubmq-agent/workspace/CLAUDE.md`, `~/.hubmq-agent/workspace/.claude/settings.json`, `~/.hubmq-agent/wrapper/`, `~/.hubmq-agent/credentials/`, `/etc/systemd/system/hubmq-agent-listener.service`
+- Config : `/var/ossec/etc/shared/hubmq-agent/agent.conf` sur manager LXC 412
+
 ---
 
-## Phase 2 — Solidification claude-hubmq (~3h total)
+## Phase 2 — Solidification claude-hubmq (~3h total) — ✅ DONE 2026-04-13
 
 Objectif : rendre le jumeau fiable en production continue.
 
