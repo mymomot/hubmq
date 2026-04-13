@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/hubmq-core", "crates/hubmq-bin"]
 
 [workspace.package]
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 authors = ["Stéphane motreffs <mymomot74@gmail.com>"]
 license = "Apache-2.0"

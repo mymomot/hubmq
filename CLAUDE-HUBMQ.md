@@ -2,27 +2,48 @@
 
 **Unified Communication Hub for Homelab** — Central notification and bidirectional agent integration service for the mymomot.ovh homelab on LXC 415.
 
-## Statut projet
+## Statut projet — **v1.0.0 (2026-04-13) première release opérationnelle**
 
-- **Phase Core** : **LIVE** (2026-04-12, daemon `hubmq.service` sur LXC 415, E2E validé)
-- **claude-hubmq jumeau** : **LIVE** (2026-04-13 05:45, listener systemd `hubmq-agent-listener.service` sur LXC 500, E2E validé en ~60s)
-- **Phase 2.4 DONE** (2026-04-13) : bridge bypass whitelist verbe pour chat_id allowlisté. Stéphane peut envoyer messages libres à `@hubmqbot`. Commits : `e78fd42` patch bypass + `329b78f` fix typo nkey_seed_path + `08b57f8` bridge bearer auth msg-relay (P0 fix 401) + `744082f` fix deploy `[ -f ]` sans sudo écrasait config.toml + `05e72c0` OnFailure misplaced (B1 fallback enfin actif)
+- **Phase Core** : LIVE 2026-04-12 (daemon `hubmq.service` LXC 415 + NATS JetStream 6 streams + Telegram polling + SMTP Gmail + fallback B1)
+- **claude-hubmq jumeau** : LIVE 2026-04-13 05:45 (listener systemd `hubmq-agent-listener.service` sur LXC 500)
+- **Phase 2 (P2.1-P2.4)** : bridge bypass chat_id + bearer auth msg-relay + lock anti-double + rotation JSONL + Wazuh FIM groupe `hubmq-agent`
+- **Phase 3** : BigBrother agent autonome (workspace + charter + wrapper + timer 1h + patch dispatcher `streams=[AGENTS,CRON]` — ALERTS/MONITOR/SYSTEM archive-only)
+- **Phase 4** : watchdog BigBrother (heartbeat + timer 30min + fallback direct DM si BB silencieux >2h ET ALERTS non vide)
+- **Phase 5 + 5.2** : **multi-bot déclaratif** (registry `conf.d/*.toml` + SIGHUP hot-reload + listener `llm-openai-compat` + admin consumer NATS + source email IMAP + sink `email_reply` threaded + routing source-aware)
 - **LXC** : 415 — `192.168.10.15` — Debian 13 — 2 vCPU / 2 GB RAM / 20 GB disk
 - **SSH** : `ssh hubmq` (motreffs, sudo NOPASSWD)
-- **Git** : `motreffs/hubmq` on Forgejo `localhost:3000` | mirror `github.com/mymomot/hubmq` (sync_on_commit) | main branch
-- **Tests** : 38 tests PASS + 2 ignored | clippy 0 warnings
-- **End-to-end** :
-  - Downstream : POST `/in/generic` severity=P1 → NATS → dispatcher → Apprise Telegram → DM ✓
-  - Upstream bidirectionnel : @hubmqbot message → NATS USER_IN → listener → spawn claude-hubmq → réponse Telegram ✓
+- **Git** : `motreffs/hubmq` on Forgejo `localhost:3000` | mirror `github.com/mymomot/hubmq` (sync_on_commit) | main branch | **tag v1.0.0**
+- **Tests** : 110 PASS + 3 ignored (Gmail/ntfy live) | clippy 0 warnings
+- **End-to-end validated** :
+  - Downstream alertes : POST `/in/generic` severity=P1 → NATS → dispatcher → Apprise Telegram → DM ✓
+  - Upstream bidirectionnel `@hubmqbot` → jumeau claude-hubmq (~60s)
+  - Upstream agent llmcore : `@hubmq_llmcore_bot` → NATS `user.inbox.llmcore` → listener llm-openai-compat → gateway :8430 → Qwen3.5-122B → DM **3.02s** ✓
+  - Admin auto-provisioning : email `HUBMQ_BOT_TOKEN <name>` body `agent:/token:` → source IMAP → `admin.bot.add` → credential + conf.d + SIGHUP → bot LIVE sans shell ✓
+- **Commits session 2026-04-13** : 13 commits (Phase 5/5.2/4/3/2 + fixes) + release tag v1.0.0
 
-## Bot Telegram
+## Bots Telegram (multi-bot v1.0.0)
 
-| Champ | Valeur |
-|---|---|
-| **Bot name** | `mymomot_hubmq_bot` (display) |
-| **Bot username** | [`@hubmqbot`](https://t.me/hubmqbot) |
-| **Bot ID** | `8730722475` |
-| **Token storage** | `/etc/hubmq/credentials/telegram-bot-token` (chmod 600 root:root) — JAMAIS dans git |
+Registry déclaratif `conf.d/bots.toml` — N bots en parallèle, chacun routé vers son `target_agent` via subject NATS dédié.
+
+| Bot | Target agent | Subject NATS | Tokens |
+|---|---|---|---|
+| [`@hubmqbot`](https://t.me/hubmqbot) (name=claude) | `claude-hubmq` | `user.incoming.telegram` (legacy) | `telegram-bot-token` |
+| `@hubmq_llmcore_bot` (name=hubmqlocalbot) | `llmcore` | `user.inbox.llmcore` | `telegram-bot-token-hubmqlocalbot` |
+
+**Tokens** : `/etc/hubmq/credentials/telegram-bot-token-<name>` (0640 root:hubmq) — créés automatiquement par admin consumer, jamais dans git.
+
+### Ajouter un nouveau bot (UX cible)
+
+1. Créer bot via `@BotFather`, récupérer token.
+2. Email `motreff@gmail.com → mymomot74@gmail.com` :
+   - Subject : `HUBMQ_BOT_TOKEN <bot_name_interne>`
+   - Body :
+     ```
+     agent: <target_agent>
+     token: <telegram_bot_token>
+     ```
+3. <30s : email polling IMAP détecte → admin consumer → atomic write + SIGHUP → bot LIVE.
+4. Ajuster `allowed_chat_ids` dans `conf.d/bots.toml` (défaut `[]` = tout rejette) + SIGHUP si besoin — V2 : champ `allowed_chat_ids:` dans le body email.
 | **Authorized chat_id** | `1451527482` (Stephane Momo) — unique allowlist dans `/etc/hubmq/config.toml` |
 | **Mode** | Polling (long polling `getUpdates`) — pas de webhook en Phase Core |
 | **Privacy settings** | `/setprivacy → Disable` + `/setjoingroups → Disable` recommandés via `@BotFather` |

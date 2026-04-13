@@ -1,38 +1,66 @@
 # HubMQ
 
-> **Unified communication hub for the mymomot.ovh homelab** — ingests alerts from any service (Wazuh, Forgejo CI, BigBrother, systemd, cron, agents) via NATS JetStream, filters them (dedup + rate limit + severity routing), and delivers via email (SMTP), ntfy push, and a bidirectional Telegram bot.
+> **Unified communication hub for the mymomot.ovh homelab** — N-bot Telegram + email IMAP ingestion, declarative routing per-agent, admin automation via Gmail, BigBrother curated observability, hot-reload registry. NATS JetStream at core, Rust Axum daemon, no webhook exposure in Phase Core.
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.93.1-orange)](https://www.rust-lang.org)
 [![NATS](https://img.shields.io/badge/NATS-2.10.24-green)](https://nats.io)
-[![Phase](https://img.shields.io/badge/phase-Core%20%E2%9C%93%20Code%20Complete-brightgreen)](./docs/plans/2026-04-12-hubmq-phase-core.md)
+[![Version](https://img.shields.io/badge/version-1.0.0-brightgreen)](./CHANGELOG.md)
+[![Phase](https://img.shields.io/badge/phase-Core%20%2B%20P2%20%2B%20P3%20%2B%20P4%20%2B%20P5%20✓-brightgreen)](./CHANGELOG.md)
 
-## Status
+## Status — v1.0.0 (2026-04-13) — first operational release
 
-**Phase Core — LIVE (2026-04-12)** — end-to-end validated.
+**5 phases completed, 110 tests PASS, E2E validated 3.02s** (Telegram → NATS → llmcore Qwen3.5-122B → reply).
 
-- ✅ 23/23 tasks implemented (33 tests PASS + 2 ignored, 0 clippy warnings)
-- ✅ LXC 415 HubMQ LIVE (192.168.10.15, Debian 13, 2 vCPU / 2 GB / 20 GB)
-- ✅ NATS JetStream v2.10.24 LIVE (6 streams with explicit limits)
-- ✅ NATS-NUI web interface at [nui.lab.mymomot.ovh](https://nui.lab.mymomot.ovh)
-- ✅ SMTP Gmail validated (`mymomot74@gmail.com` App Password)
-- ✅ Wazuh agent 010 Active (FIM + audit log)
-- ✅ **Telegram bot [`@hubmqbot`](https://t.me/hubmqbot) LIVE** — polling mode, chat_id allowlist, forward rejection
-- ✅ **hubmq daemon LIVE** on LXC 415 — `systemctl status hubmq.service` → active
-- ✅ **End-to-end validated** : `POST /in/generic severity=P1` → Telegram DM received
-- 📋 Phase Exposure planned (2 days) — ntfy public + Telegram webhook Internet
+- ✅ **Phase Core** (2026-04-12) : ingestion multi-source + 6 NATS streams + dispatcher + Apprise Telegram + SMTP Gmail + fallback B1
+- ✅ **P2.4 + bridge bearer auth** (2026-04-13) : bypass whitelist verbe chat_id allowlisté + bearer credential msg-relay
+- ✅ **Phase 2 jumeau hardening** (2026-04-13) : lock anti-double, rotation session JSONL, Wazuh FIM groupe `hubmq-agent`
+- ✅ **Phase 3 BigBrother** (2026-04-13) : agent autonome horaire, dispatcher streams `[AGENTS, CRON]`, ALERTS/MONITOR/SYSTEM archive-only
+- ✅ **Phase 4 watchdog** (2026-04-13) : heartbeat BB + timer 30min + fallback DM direct si BB silencieux
+- ✅ **Phase 5 + 5.2 multi-bot + email source** (2026-04-13) : N bots déclaratifs conf.d/*.toml, SIGHUP hot-reload, listener `llm-openai-compat` générique, admin consumer NATS, source email IMAP + sink `email_reply` threaded, routing source-aware
+- ✅ **End-to-end** : `@hubmq_llmcore_bot` → Qwen3.5-122B via `llm-free-gateway :8430` → DM reply **3.02s**
+- 📋 **V2 backlog** : `admin.agent.add`, kind `custom-http` (zeroclaw/gemini), UI dashboard, Phase Exposure (ntfy public + Telegram webhook Internet)
 
-## Architecture — 2-phase approach
+## Architecture — multi-source, declarative, self-admin
 
-## Telegram Bot
+## Telegram Bots (N bots, declarative)
 
-- **Username** : [`@hubmqbot`](https://t.me/hubmqbot) (bot ID `8730722475`)
-- **Mode** : Polling (no Internet-facing webhook in Phase Core)
-- **Allowlist** : single `chat_id` declared in `/etc/hubmq/config.toml` → `[telegram] allowed_chat_ids = [...]`
-- **Security** : forwarded messages rejected (B2), unknown chat_id silently dropped with audit entry
-- **Upstream commands** : whitelist `["status", "logs", "help"]` in `[bridge] command_whitelist` → forwarded to `msg-relay` at `192.168.10.99:9480` → delivered to Claude Code
-- **Downstream alerts** : delivered via Apprise `tgram://TOKEN/CHAT_ID` when severity routing picks Telegram channel (P0 always, P1 always, P2 outside quiet hours)
-- **Token storage** : `/etc/hubmq/credentials/telegram-bot-token` (chmod 600 root:root, via systemd `LoadCredential`) — never in git
+Registry `conf.d/bots.toml` : chaque entrée `[[bot]]` = 1 polling task indépendant + token dédié + allowlist chat_ids + agent cible.
+
+Bots actifs (v1.0.0) :
+- [`@hubmqbot`](https://t.me/hubmqbot) → agent `claude-hubmq` (jumeau Claude Code, subject `user.incoming.telegram` legacy)
+- `@hubmq_llmcore_bot` → agent `llmcore` (Qwen3.5-122B via gateway, subject `user.inbox.llmcore`)
+
+Caractéristiques communes :
+- **Mode** : polling (no webhook exposure Phase Core)
+- **Allowlist per-bot** : `allowed_chat_ids = [...]` in `conf.d/bots.toml`
+- **Security** : forwarded messages rejected (B2), unknown chat_id silently dropped + audit
+- **Routing** : `target_agent` détermine le subject publish (NATS USER_IN)
+- **Tokens** : `/etc/hubmq/credentials/telegram-bot-token-<name>` (0640 root:hubmq) — créés automatiquement par admin consumer, jamais dans git
+
+### Ajout d'un bot — flow automatisé via Gmail
+
+1. Créer bot via `@BotFather`, récupérer token.
+2. Email depuis `motreff@gmail.com` vers `mymomot74@gmail.com` :
+   - **Subject** : `HUBMQ_BOT_TOKEN <bot_name_interne>`
+   - **Body** :
+     ```
+     agent: <target_agent>
+     token: <telegram_bot_token>
+     ```
+3. Source IMAP hubmq détecte, extrait, publish `admin.bot.add` NATS.
+4. Admin consumer valide (regex + cross-ref agent existe), atomic write credential + `conf.d/bots.toml`, SIGHUP self, polling task spawnée.
+5. Reply email auto dans le thread : bot actif.
+
+Aucune intervention shell requise. Le token ne transite **jamais** via Telegram chat (log serveur, historique client) — seul canal : emails end-to-end Gmail-to-Gmail (MFA activé des 2 côtés).
+
+## Email source (symmetric USER_IN channel)
+
+Polling IMAP Gmail toutes les 30s (`imap.gmail.com:993` + app password `gmail-app-password` réutilisé de SMTP) :
+- Allowlist `From:` stricte avec extraction angle-bracket (anti-substring bypass)
+- Subject routing : `HUBMQ_BOT_TOKEN <name>` → admin pipe | `[<agent>] <msg>` ou `<agent>: <msg>` → `user.inbox.<agent>`
+- Mark as read post-traitement (éviter re-delivery)
+- Reply auto dans le thread via `EmailReplySink` (headers `In-Reply-To` + `References`)
 
 **Phase Core (LAN only)** — this repo :
 - NATS JetStream bus internal to LXC 415
