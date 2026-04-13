@@ -157,9 +157,8 @@ async fn handle(
         .await
         .ok();
 
-    // ACK visuel à l'expéditeur
-    bot.send_message(msg.chat.id, "\u{2713} Reçu — dispatché à HubMQ")
-        .await?;
+    // Pas d'ack visuel : la réponse de l'agent cible suffit. Un double message "Reçu"
+    // avant la vraie réponse pollue le thread Telegram.
 
     Ok(())
 }

@@ -284,10 +284,12 @@ async fn publish_response(
 
     // P1 : réponse conversationnelle utilisateur — bypass quiet hours, delivery immédiate
     // (P2 tomberait en log_only la nuit entre 22h-07h config quiet).
+    // Title vide : Apprise/Telegram ne préfixe pas le body avec un titre verbeux
+    // (UX : le user voit juste la réponse de l'agent, pas "réponse llmcore pour tg msg from X").
     let mut resp_msg = Message::new(
         format!("agent.{}", agent_name),
         Severity::P1,
-        format!("réponse {} pour {}", agent_name, original.title),
+        String::new(),
         response_text,
     );
     resp_msg.tags = vec!["agent-response".into(), agent_name.to_string()];
