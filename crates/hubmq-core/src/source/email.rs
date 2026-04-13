@@ -140,24 +140,71 @@ fn extract_colon_subject(s: &str) -> Option<(String, String)> {
 
 /// Extrait le token Telegram depuis le corps d'un email admin.
 ///
+/// Supporte deux formats :
+/// - Nouveau format V1.3 : `token: 1234567890:AAH...` (ligne clé:valeur)
+/// - Format legacy V1.2 : token nu sur n'importe quelle ligne
+///
 /// Cherche un pattern `\d{8,}:[A-Za-z0-9_-]{30,}`.
 /// Retourne `None` si aucun token valide n'est trouvé.
 ///
 /// Le token n'est JAMAIS loggé (responsabilité de l'appelant).
 pub fn extract_token_from_body(body: &str) -> Option<String> {
+    // Priorité au nouveau format : `token: <value>`
+    if let Some(value) = extract_admin_field(body, "token") {
+        if is_valid_telegram_token(&value) {
+            return Some(value);
+        }
+    }
+
+    // Fallback legacy : recherche manuelle d'un token nu dans le body.
     // Recherche manuelle pour éviter la dépendance `regex` (non présente dans le workspace).
     // Pattern : <digits 8+>:<alphanum+dash+underscore 30+>
     for line in body.lines() {
         for word in line.split_whitespace() {
-            if let Some(colon_pos) = word.find(':') {
-                let digits_part = &word[..colon_pos];
-                let rest = &word[colon_pos + 1..];
-                if digits_part.len() >= 8
-                    && digits_part.chars().all(|c| c.is_ascii_digit())
-                    && rest.len() >= 30
-                    && rest.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-')
-                {
-                    return Some(word.to_string());
+            if is_valid_telegram_token(word) {
+                return Some(word.to_string());
+            }
+        }
+    }
+    None
+}
+
+/// Vérifie si une chaîne correspond au pattern d'un token Telegram valide.
+///
+/// Format : `<digits 8+>:<alphanum+dash+underscore 30+>`
+fn is_valid_telegram_token(s: &str) -> bool {
+    if let Some(colon_pos) = s.find(':') {
+        let digits_part = &s[..colon_pos];
+        let rest = &s[colon_pos + 1..];
+        return digits_part.len() >= 8
+            && digits_part.chars().all(|c| c.is_ascii_digit())
+            && rest.len() >= 30
+            && rest.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-');
+    }
+    false
+}
+
+/// Extrait la valeur d'un champ clé:valeur depuis le corps d'un email admin.
+///
+/// Parcourt les lignes et cherche `<key>:\s*<value>` (case-insensitive).
+/// Retourne la valeur trimée, ou `None` si le champ est absent.
+///
+/// # Exemple
+/// ```
+/// use hubmq_core::source::email::extract_admin_field;
+/// let body = "agent: llmcore\ntoken: 1234:abc";
+/// assert_eq!(extract_admin_field(body, "agent"), Some("llmcore".to_string()));
+/// ```
+pub fn extract_admin_field(body: &str, key: &str) -> Option<String> {
+    let key_lower = key.to_lowercase();
+    for line in body.lines() {
+        // Cherche le premier `:` pour séparer clé et valeur
+        if let Some(colon_pos) = line.find(':') {
+            let line_key = line[..colon_pos].trim().to_lowercase();
+            if line_key == key_lower {
+                let value = line[colon_pos + 1..].trim().to_string();
+                if !value.is_empty() {
+                    return Some(value);
                 }
             }
         }
@@ -405,10 +452,23 @@ fn handle_admin_email(
     let token = extract_token_from_body(body)
         .ok_or_else(|| anyhow::anyhow!("token Telegram introuvable dans le body de l'email admin"))?;
 
+    // V1.3 : target_agent extrait depuis `agent:` dans le body.
+    // Fallback V1.2 : si absent, target_agent = bot_name (rétrocompat).
+    let target_agent = match extract_admin_field(body, "agent") {
+        Some(agent) => agent,
+        None => {
+            tracing::warn!(
+                bot_name = %bot_name,
+                "format email admin legacy (V1.2) — target_agent = bot_name (champ `agent:` absent)"
+            );
+            bot_name.to_string()
+        }
+    };
+
     // Construction payload admin.bot.add (étendu avec requester_email)
     let payload = serde_json::json!({
         "name": bot_name,
-        "target_agent": bot_name,
+        "target_agent": target_agent,
         "token": token,
         "allowed_chat_ids": [],
         "requester_email": from,
@@ -432,6 +492,7 @@ fn handle_admin_email(
 
     tracing::info!(
         bot_name = %bot_name,
+        target_agent = %target_agent,
         from = %from,
         "email admin traité — publish admin.bot.add (token non loggé)"
     );
@@ -1001,5 +1062,66 @@ mod tests {
         let text = result.unwrap();
         assert!(text.contains("Hello from plain!"));
         assert!(!text.contains("<html>"));
+    }
+
+    // ── extract_admin_field (V1.3) ────────────────────────────────────────────
+
+    #[test]
+    fn extract_admin_field_basic() {
+        let body = "agent: llmcore\ntoken: abc:def";
+        assert_eq!(extract_admin_field(body, "agent"), Some("llmcore".to_string()));
+    }
+
+    #[test]
+    fn extract_admin_field_case_insensitive() {
+        let body_upper = "Agent: llmcore\ntoken: abc:def";
+        assert_eq!(extract_admin_field(body_upper, "agent"), Some("llmcore".to_string()));
+
+        let body_all_caps = "AGENT: foo\ntoken: abc:def";
+        assert_eq!(extract_admin_field(body_all_caps, "agent"), Some("foo".to_string()));
+    }
+
+    #[test]
+    fn extract_admin_field_missing() {
+        let body = "token: abc:def\nsome: other";
+        assert_eq!(extract_admin_field(body, "agent"), None);
+    }
+
+    #[test]
+    fn extract_admin_field_multiline() {
+        let body = "agent: llmcore\n\nsome other text";
+        assert_eq!(extract_admin_field(body, "agent"), Some("llmcore".to_string()));
+    }
+
+    #[test]
+    fn extract_admin_field_with_trailing_whitespace() {
+        let body = "agent:   llmcore   ";
+        assert_eq!(extract_admin_field(body, "agent"), Some("llmcore".to_string()));
+    }
+
+    #[test]
+    fn admin_flow_with_agent_field() {
+        // Vérifie que extract_token_from_body + extract_admin_field coopèrent correctement
+        // pour le format V1.3 : agent: et token: dans le body.
+        let body = "agent: llmcore\ntoken: 1234567890:AAHbbccddEEFFGGHHIIJJKKLLMMNNOOPPQQ";
+        let token = extract_token_from_body(body);
+        assert!(token.is_some(), "token doit être extrait depuis `token:` V1.3");
+        let t = token.unwrap();
+        assert!(t.starts_with("1234567890:"), "token doit correspondre au pattern Telegram");
+
+        let agent = extract_admin_field(body, "agent");
+        assert_eq!(agent, Some("llmcore".to_string()), "target_agent doit être extrait depuis `agent:`");
+    }
+
+    #[test]
+    fn admin_flow_legacy_no_agent_field() {
+        // Format V1.2 : token nu dans le body, pas de champ `agent:`.
+        // extract_admin_field retourne None → fallback target_agent = bot_name.
+        let body = "Voici le token :\n1234567890:AABBCCDDEE_FF-GGHHIIJJKKLLMMNNOOPPQQRRSSTTUUVVWWXXYYZZaa\n\nBonne chance !";
+        let agent = extract_admin_field(body, "agent");
+        assert_eq!(agent, None, "pas de champ `agent:` → None → fallback vers bot_name");
+
+        let token = extract_token_from_body(body);
+        assert!(token.is_some(), "token doit être trouvé via la recherche legacy");
     }
 }
