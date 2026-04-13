@@ -24,6 +24,12 @@ Vue d'ensemble & statut dans `CLAUDE-HUBMQ.md` à la racine.
 - E2E validé (~60s message → DM)
 - Commit `e40d63f` + doc `deploy/agent/README.md`
 
+### P2.4 — Bridge bypass chat_id allowlisté (2026-04-13, LIVE)
+- Patch `crates/hubmq-core/src/bridge.rs` : méthode pure `decide()` + bypass whitelist verbe quand `chat_id ∈ telegram.allowed_chat_ids`
+- Audit `bridge_command_dispatched` enrichi : `bypass=chat_id_allowlisted` quand actif
+- 7 tests unitaires (bypass + régression non-allowlisté) — workspace 38/38 PASS, clippy clean
+- Commits : `e78fd42` patch + `329b78f` fix typo `nkey_seed_path` (révélé au 1er deploy CI réussi run #20)
+
 ---
 
 ## Phase 2 — Solidification claude-hubmq (~3h total)

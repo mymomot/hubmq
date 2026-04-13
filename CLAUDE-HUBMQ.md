@@ -6,10 +6,11 @@
 
 - **Phase Core** : **LIVE** (2026-04-12, daemon `hubmq.service` sur LXC 415, E2E validé)
 - **claude-hubmq jumeau** : **LIVE** (2026-04-13 05:45, listener systemd `hubmq-agent-listener.service` sur LXC 500, E2E validé en ~60s)
+- **Phase 2.4 DONE** (2026-04-13 06:30) : bridge bypass whitelist verbe pour chat_id allowlisté. Stéphane peut envoyer messages libres à `@hubmqbot` (commits `e78fd42` patch + `329b78f` fix typo nkey_seed_path révélé au 1er deploy CI réussi)
 - **LXC** : 415 — `192.168.10.15` — Debian 13 — 2 vCPU / 2 GB RAM / 20 GB disk
 - **SSH** : `ssh hubmq` (motreffs, sudo NOPASSWD)
 - **Git** : `motreffs/hubmq` on Forgejo `localhost:3000` | mirror `github.com/mymomot/hubmq` (sync_on_commit) | main branch
-- **Tests** : 33 tests PASS + 2 ignored | clippy 0 warnings
+- **Tests** : 38 tests PASS + 2 ignored | clippy 0 warnings
 - **End-to-end** :
   - Downstream : POST `/in/generic` severity=P1 → NATS → dispatcher → Apprise Telegram → DM ✓
   - Upstream bidirectionnel : @hubmqbot message → NATS USER_IN → listener → spawn claude-hubmq → réponse Telegram ✓
