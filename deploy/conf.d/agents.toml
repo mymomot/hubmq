@@ -14,12 +14,13 @@ kind = "claude-code-spawn"
 listener_subject = "user.incoming.telegram"
 
 [[agent]]
-# Agent llmcore : LLM qwen3.5-122b sur GMKTEC llmcore (192.168.10.118).
+# Agent llmcore : LLM qwen3.5-122b routé via llm-free-gateway (LXC 500 :8430).
+# Gateway gère alias multi-modèle + failover OpenRouter si llmcore down.
 # kind = "llm-openai-compat" : le daemon HubMQ crée un listener Rust qui
 # subscribe user.inbox.llmcore, appelle l'endpoint HTTP et publie la réponse.
 name = "llmcore"
 kind = "llm-openai-compat"
-endpoint = "http://192.168.10.118:8080/v1/chat/completions"
+endpoint = "http://192.168.10.99:8430/v1/chat/completions"
 model = "qwen3.5-122b"
 system_prompt = "Tu es llmcore, assistant direct et concis accessible via @hubmq_llmcore_bot. Langue : français. Réponses courtes sauf si l'utilisateur demande plus de détails."
 timeout_secs = 120
