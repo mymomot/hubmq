@@ -1,0 +1,17 @@
+# Registry des bots Telegram HubMQ — bootstrap statique
+# Déployé vers /etc/hubmq/conf.d/bots.toml (uniquement si absent)
+#
+# Permissions attendues : /etc/hubmq/conf.d/ = 0770 root:hubmq
+# Le fichier est modifié dynamiquement par l'admin consumer (admin.bot.add / remove).
+#
+# IMPORTANT : ne pas supprimer ce fichier en prod — il sera recréé vide.
+# Utiliser admin.bot.remove pour retirer un bot proprement.
+
+[[bot]]
+# Bot principal @hubmqbot — messages routés vers l'agent claude-hubmq.
+# token_credential : nom du fichier dans /etc/hubmq/credentials/
+name = "claude"
+token_credential = "telegram-bot-token"
+target_agent = "claude-hubmq"
+# Remplacer 1451527482 par le vrai chat_id Stéphane si différent.
+allowed_chat_ids = [1451527482]

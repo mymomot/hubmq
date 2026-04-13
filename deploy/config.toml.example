@@ -36,3 +36,22 @@ bearer_credential = "msg-relay-token"
 # base_url = "http://localhost:2586"
 # topic = "hubmq-alerts"
 # bearer_credential = "ntfy-bearer"
+
+# ─── Source email IMAP — optionnelle (Phase 5.2) ────────────────────────────────
+# Polling Gmail IMAP toutes les 30s. Désactivé par défaut (backward compat).
+# Credential IMAP = même que smtp.password_credential (gmail-app-password).
+#
+# Commandes acceptées (sujet de l'email) :
+#   HUBMQ_BOT_TOKEN <name>       → admin : ajout bot Telegram (token dans le body)
+#   [<agent>] <message>          → message utilisateur vers l'agent (ex: [llmcore] explique CAP)
+#   <agent>: <message>           → idem (ex: llmcore: explique CAP)
+#
+# Seuls les emails From: allowlisted sont traités — les autres sont ignorés silencieusement.
+[email_source]
+enabled = false
+imap_host = "imap.gmail.com"
+imap_port = 993
+# username : réutilisé depuis [smtp].username (mymomot74@gmail.com)
+# password_credential : réutilisé depuis [smtp].password_credential (gmail-app-password)
+allowed_from = ["motreff@gmail.com"]
+poll_interval_secs = 30

@@ -55,16 +55,19 @@ impl NatsConn {
     /// | AGENTS   | agent.>         | 7 jours  | 10 000   | 200 MB    |
     /// | SYSTEM   | system.>        | 3 jours  | 5 000    | 100 MB    |
     /// | CRON     | cron.>          | 1 jour   | 5 000    | 50 MB     |
-    /// | USER_IN  | user.incoming.> | 30 jours | 10 000   | 500 MB    |
+    /// | USER_IN  | user.incoming.>, user.inbox.> | 30 jours | 10 000   | 500 MB    |
     pub async fn ensure_streams(&self) -> anyhow::Result<()> {
         // (nom, subjects, max_age_secs, max_messages, max_bytes)
+        // USER_IN couvre :
+        //   - user.incoming.telegram : bot par défaut (claude-hubmq)
+        //   - user.inbox.<agent>     : Phase 5 — bots multi-cibles (llmcore, gemini, etc.)
         let streams: &[(&str, &[&str], u64, i64, i64)] = &[
-            ("ALERTS",  &["alert.>"],          7 * 86400,  50_000, 500 * 1024 * 1024),
-            ("MONITOR", &["monitor.>"],             86400,  10_000, 100 * 1024 * 1024),
-            ("AGENTS",  &["agent.>"],          7 * 86400,  10_000, 200 * 1024 * 1024),
-            ("SYSTEM",  &["system.>"],         3 * 86400,   5_000, 100 * 1024 * 1024),
-            ("CRON",    &["cron.>"],               86400,   5_000,  50 * 1024 * 1024),
-            ("USER_IN", &["user.incoming.>"], 30 * 86400,  10_000, 500 * 1024 * 1024),
+            ("ALERTS",  &["alert.>"],                                 7 * 86400,  50_000, 500 * 1024 * 1024),
+            ("MONITOR", &["monitor.>"],                                    86400,  10_000, 100 * 1024 * 1024),
+            ("AGENTS",  &["agent.>"],                                 7 * 86400,  10_000, 200 * 1024 * 1024),
+            ("SYSTEM",  &["system.>"],                                3 * 86400,   5_000, 100 * 1024 * 1024),
+            ("CRON",    &["cron.>"],                                       86400,   5_000,  50 * 1024 * 1024),
+            ("USER_IN", &["user.incoming.>", "user.inbox.>"],         30 * 86400,  10_000, 500 * 1024 * 1024),
         ];
 
         for &(name, subjects, max_age_secs, max_messages, max_bytes) in streams {
@@ -79,10 +82,20 @@ impl NatsConn {
                 ..Default::default()
             };
 
-            self.js
-                .get_or_create_stream(cfg)
-                .await
-                .with_context(|| format!("bootstrap stream {}", name))?;
+            // Idempotent : create if missing, update subjects/limits si existant.
+            // update_stream() crée le stream s'il n'existe pas ET met à jour les subjects
+            // sur un stream existant (contrairement à get_or_create_stream qui ignore les
+            // changements de config sur un stream déjà présent).
+            match self.js.update_stream(&cfg).await {
+                Ok(_) => {}
+                Err(_) => {
+                    // Fallback : si update échoue (stream absent), create
+                    self.js
+                        .get_or_create_stream(cfg)
+                        .await
+                        .with_context(|| format!("bootstrap stream {}", name))?;
+                }
+            }
 
             tracing::info!(stream = name, "stream prêt");
         }

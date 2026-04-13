@@ -1,0 +1,26 @@
+# Registry des agents HubMQ — bootstrap statique
+# Déployé vers /etc/hubmq/conf.d/agents.toml (uniquement si absent)
+#
+# Permissions attendues : /etc/hubmq/conf.d/ = 0770 root:hubmq
+#
+# Ajouter de nouveaux agents ici ou via admin.agent.add (V2 backlog).
+
+[[agent]]
+# Agent claude-hubmq : jumeau Claude Code sur LXC 500.
+# kind = "claude-code-spawn" : le listener externe (hubmq-agent-listener.service)
+# gère le spawn — aucun listener Rust n'est créé pour ce kind.
+name = "claude-hubmq"
+kind = "claude-code-spawn"
+listener_subject = "user.incoming.telegram"
+
+[[agent]]
+# Agent llmcore : LLM qwen3.5-122b sur GMKTEC llmcore (192.168.10.118).
+# kind = "llm-openai-compat" : le daemon HubMQ crée un listener Rust qui
+# subscribe user.inbox.llmcore, appelle l'endpoint HTTP et publie la réponse.
+name = "llmcore"
+kind = "llm-openai-compat"
+endpoint = "http://192.168.10.118:8080/v1/chat/completions"
+model = "qwen3.5-122b"
+system_prompt = "Tu es llmcore, assistant direct et concis accessible via @hubmq_llmcore_bot. Langue : français. Réponses courtes sauf si l'utilisateur demande plus de détails."
+timeout_secs = 120
+listener_subject = "user.inbox.llmcore"

@@ -25,6 +25,8 @@ struct ForwardDecision {
 ///
 /// Construit depuis la section `[bridge]` de la configuration.
 /// Si `url` est `None`, toutes les opérations retournent `Ok(false)` sans I/O.
+/// `Clone` est implémenté car `reqwest::Client` est cheaply cloneable (Arc interne).
+#[derive(Clone)]
 pub struct Bridge {
     client: Client,
     /// URL de base du service msg-relay (ex. `http://localhost:9480`).
@@ -222,6 +224,7 @@ mod tests {
             },
             bridge: BridgeConfig::default(),
             ntfy: NtfyConfig::default(),
+            email_source: None,
         }
     }
 

@@ -25,6 +25,10 @@ uuid.workspace = true
 sha2.workspace = true
 async-trait.workspace = true
 futures-util.workspace = true
+glob.workspace = true
+nix.workspace = true
+imap.workspace = true
+native-tls.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "macros"] }

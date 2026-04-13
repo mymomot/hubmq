@@ -13,6 +13,7 @@ User=hubmq
 Group=hubmq
 Environment=RUST_LOG=info,hubmq_core=debug
 Environment=HUBMQ_CONFIG=/etc/hubmq/config.toml
+Environment=HUBMQ_CONF_D=/etc/hubmq/conf.d
 
 # D3 — systemd LoadCredential (files remain root:root 600, service sees them via $CREDENTIALS_DIRECTORY)
 LoadCredential=gmail-app-password:/etc/hubmq/credentials/gmail-app-password
@@ -20,12 +21,16 @@ LoadCredential=telegram-bot-token:/etc/hubmq/credentials/telegram-bot-token
 LoadCredential=msg-relay-token:/etc/hubmq/credentials/msg-relay-token
 
 ExecStart=/usr/local/bin/hubmq
+# SIGHUP déclenche un reload du registry conf.d (hot-reload bots/listeners sans restart)
+ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=5
 
 # Hardening
 ProtectSystem=strict
-ReadWritePaths=/var/lib/hubmq /var/log/hubmq
+# conf.d et credentials doivent être accessibles en écriture par le daemon
+# pour que l'admin consumer puisse créer les tokens et modifier bots.toml.
+ReadWritePaths=/var/lib/hubmq /var/log/hubmq /etc/hubmq/conf.d /etc/hubmq/credentials
 ProtectHome=yes
 PrivateTmp=yes
 NoNewPrivileges=yes

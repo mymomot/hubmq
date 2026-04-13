@@ -4,6 +4,7 @@ use async_trait::async_trait;
 
 pub mod apprise;
 pub mod email;
+pub mod email_reply;
 pub mod ntfy;
 
 /// Canal de livraison : tout backend de notification implémente ce trait.
