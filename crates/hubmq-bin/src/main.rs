@@ -325,6 +325,21 @@ async fn main() -> anyhow::Result<()> {
                     handle.abort();
                 }
 
+                // FIX critique : abort les tâches encore actives (bots + listeners "unchanged")
+                // AVANT de rebuild via spawn_all. Sinon spawn_all crée des doublons polling
+                // le même token Telegram → erreur 409 TerminatedByOtherGetUpdates.
+                // Les bots/listeners seront respawnés propres ci-dessous.
+                for (name, handle) in active_bot_handles.drain() {
+                    tracing::debug!(bot = %name, "abort ancien polling bot avant respawn");
+                    handle.abort();
+                }
+                for (name, handle) in active_listener_handles.drain() {
+                    tracing::debug!(listener = %name, "abort ancien listener avant respawn");
+                    handle.abort();
+                }
+                // Bref délai pour laisser les connexions Telegram se fermer côté API
+                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
                 // Rebuild dispatcher avec nouveaux sinks + spawn bots/listeners nouveaux
                 active_dispatcher.abort();
                 active_admin.abort();
@@ -351,12 +366,13 @@ async fn main() -> anyhow::Result<()> {
                     }
                 };
 
-                // Fusionner les nouveaux handles — skip les bots déjà actifs
+                // Tous les anciens handles ont été aborted ci-dessus : insertion directe
+                // (active_bot_handles/active_listener_handles ont été drain())
                 for (name, handle) in new_bot_handles {
-                    active_bot_handles.entry(name).or_insert(handle);
+                    active_bot_handles.insert(name, handle);
                 }
                 for (name, handle) in new_listener_handles {
-                    active_listener_handles.entry(name).or_insert(handle);
+                    active_listener_handles.insert(name, handle);
                 }
                 active_dispatcher = new_dispatcher;
                 active_admin = new_admin;
