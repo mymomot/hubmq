@@ -20,7 +20,7 @@ listener_subject = "user.incoming.telegram"
 # subscribe user.inbox.llmcore, appelle l'endpoint HTTP et publie la réponse.
 name = "llmcore"
 kind = "llm-openai-compat"
-endpoint = "http://192.168.10.99:8430/v1/chat/completions"
+endpoint = "http://192.168.10.99:8435/v1/chat/completions"
 model = "qwen3.5-122b"
 system_prompt = "Tu es llmcore, assistant direct et concis accessible via @hubmq_llmcore_bot. Langue : français. Réponses courtes sauf si l'utilisateur demande plus de détails."
 timeout_secs = 120
